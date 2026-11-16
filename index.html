@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<link rel="icon" href="data:," />
+<title>商品リスト入力（試作）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+:root {
+--bg: #faf7f4;
+--surface: #ffffff;
+--surface-2: #f3eee9;
+--ink: #2e2430;
+--ink-soft: #5d5261;
+--muted: #8b7f8f;
+--line: #e6dce4;
+--accent: #6f549e;
+--accent-ink: #ffffff;
+--accent-soft: #efe8f7;
+--chip: #f0e9e2;
+--danger: #b3402e;
+--ok: #2e7d4f;
+--shadow: 0 10px 30px rgba(46, 36, 48, 0.14);
+--radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+:root {
+--bg: #171319;
+--surface: #221c28;
+--surface-2: #2a2333;
+--ink: #f0eaf4;
+--ink-soft: #cfc4d6;
+--muted: #a293ad;
+--line: #3d3247;
+--accent: #b79ce0;
+--accent-ink: #241a33;
+--accent-soft: #352a49;
+--chip: #322a3d;
+--danger: #e08a7a;
+--ok: #7fc79b;
+--shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+}
+* { box-sizing: border-box;}
+html { -webkit-text-size-adjust: 100%;}
+body {
+margin: 0;
+background: var(--bg);
+color: var(--ink);
+font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+font-size: 16px;
+line-height: 1.6;
+}
+button, input, textarea { font: inherit; color: inherit;}
+button { cursor: pointer;}
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 120px;}
+
+header.page-head { margin-bottom: 18px;}
+header.page-head h1 {
+font-family: "Shippori Mincho B1", "Hiragino Mincho ProN", serif;
+font-size: 28px; font-weight: 700; margin: 0 0 6px; letter-spacing: 0.02em;
+}
+header.page-head p { margin: 0; color: var(--ink-soft); font-size: 14.5px;}
+header.page-head p strong { color: var(--ink);}
+
+.toolbar {
+position: sticky; top: 0; z-index: 30;
+background: var(--bg);
+padding: 10px 0 12px;
+}
+.search-row { display: flex; gap: 8px;}
+.search-box { flex: 1; position: relative;}
+.search-box input {
+width: 100%; min-height: 52px; padding: 12px 44px 12px 16px;
+border: 1.5px solid var(--line); border-radius: 999px;
+background: var(--surface); font-size: 16px;
+}
+.search-box input:focus { outline: 2px solid var(--accent); outline-offset: 1px;}
+.search-clear {
+position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+width: 40px; height: 40px; border: none; border-radius: 999px;
+background: transparent; color: var(--muted); font-size: 20px; display: none;
+}
+.search-clear.show { display: block;}
+.mode-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px;}
+.seg {
+display: inline-flex; background: var(--surface-2); border: 1px solid var(--line);
+border-radius: 999px; padding: 4px; gap: 4px;
+}
+.seg button {
+border: none; background: transparent; border-radius: 999px;
+min-height: 44px; padding: 8px 18px; font-weight: 700; font-size: 15px; color: var(--ink-soft);
+}
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink);}
+.mode-note { font-size: 13.5px; color: var(--muted);}
+.expand-btns { margin-left: auto; display: flex; gap: 6px;}
+.expand-btns button {
+min-height: 40px; padding: 6px 12px; border-radius: 999px;
+border: 1px solid var(--line); background: var(--surface); font-size: 13.5px; color: var(--ink-soft);
+}
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 22px; align-items: start;}
+@media (max-width: 900px) {.layout { grid-template-columns: minmax(0, 1fr);}}
+
+/* ---------- category tree ---------- */
+.group {
+background: var(--surface); border: 1px solid var(--line);
+border-radius: var(--radius); margin-bottom: 14px; overflow: hidden;
+}
+.group-head {
+width: 100%; display: flex; align-items: center; gap: 10px;
+min-height: 60px; padding: 14px 16px; border: none; background: var(--surface);
+text-align: left;
+}
+.group-head .gname {
+font-family: "Shippori Mincho B1", "Hiragino Mincho ProN", serif;
+font-size: 19px; font-weight: 700; flex: 1; min-width: 0;
+}
+.count-chip {
+flex: none; background: var(--chip); color: var(--ink-soft);
+border-radius: 999px; padding: 2px 10px; font-size: 12.5px; font-weight: 500;
+}
+.chev { flex: none; color: var(--muted); font-size: 15px; transition: transform 0.18s ease;}
+.group.open .group-head .chev, .cat.open .cat-head .chev { transform: rotate(180deg);}
+.group-body { display: none; border-top: 1px solid var(--line);}
+.group.open .group-body { display: block;}
+
+.direct-label {
+padding: 12px 16px 4px; font-size: 13px; font-weight: 700; color: var(--accent);
+}
+.cat { border-top: 1px solid var(--line);}
+.cat:first-child { border-top: none;}
+.cat-head {
+width: 100%; display: flex; align-items: center; gap: 10px;
+min-height: 54px; padding: 10px 16px 10px 22px; border: none;
+background: var(--surface-2); text-align: left;
+}
+.cat-head .cname { font-size: 16px; font-weight: 700; flex: 1; min-width: 0;}
+.cat-body { display: none;}
+.cat.open .cat-body { display: block;}
+.empty-note { padding: 14px 22px; color: var(--muted); font-size: 14px; margin: 0;}
+
+.prod {
+display: flex; align-items: stretch; gap: 0;
+border-top: 1px solid var(--line); background: var(--surface);
+}
+.prod-main {
+flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+min-height: 58px; padding: 10px 6px 10px 22px; border: none; background: transparent;
+text-align: left;
+}
+.prod-main .pname { flex: 1; min-width: 0; font-size: 15.5px; line-height: 1.45; overflow-wrap: anywhere;}
+.prod-main .pprice { flex: none; color: var(--ink-soft); font-size: 14px; white-space: nowrap;}
+.prod-main .plus {
+flex: none; width: 38px; height: 38px; border-radius: 999px;
+display: inline-flex; align-items: center; justify-content: center;
+background: var(--accent-soft); color: var(--accent); font-size: 22px; font-weight: 700; line-height: 1;
+}
+.prod.in-cart { background: var(--accent-soft);}
+@media (prefers-color-scheme: dark) {.prod.in-cart { background: var(--accent-soft);}}
+.prod .stepper { flex: none; display: none; align-items: center; gap: 2px; padding: 6px 10px 6px 0;}
+.prod.in-cart .stepper { display: flex;}
+.prod.in-cart .plus { display: none;}
+.stepper button {
+width: 42px; height: 42px; border-radius: 999px; border: 1px solid var(--line);
+background: var(--surface); font-size: 19px; font-weight: 700; line-height: 1;
+}
+.stepper .qty { min-width: 30px; text-align: center; font-weight: 700; font-size: 16px;}
+.cat-path { display: block; font-size: 12px; color: var(--muted);}
+
+/* ---------- side panel ---------- */
+.panel {
+position: sticky; top: 118px;
+background: var(--surface); border: 1px solid var(--line);
+border-radius: var(--radius); box-shadow: var(--shadow);
+overflow: hidden;
+}
+.panel-tabs { display: flex; border-bottom: 1px solid var(--line);}
+.panel-tabs button {
+flex: 1; min-height: 52px; border: none; background: var(--surface-2);
+font-weight: 700; font-size: 15.5px; color: var(--ink-soft); padding: 10px 6px;
+}
+.panel-tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: inset 0 -3px 0 var(--accent);}
+.panel-body { padding: 16px;}
+.panel-body h2 { font-size: 16px; margin: 0 0 4px;}
+.panel-body .hint { font-size: 13.5px; color: var(--muted); margin: 0 0 12px;}
+
+.sel-empty { color: var(--muted); font-size: 14.5px; padding: 14px 0; margin: 0;}
+.sel-item { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;}
+.sel-item .sname { font-size: 15px; line-height: 1.45; overflow-wrap: anywhere;}
+.sel-item .srow { display: flex; align-items: center; gap: 6px; margin-top: 8px;}
+.sel-item .sprice { margin-left: auto; font-weight: 700; white-space: nowrap;}
+.sel-item .remove {
+min-height: 42px; padding: 6px 10px; border: none; background: transparent;
+color: var(--danger); font-size: 13.5px; font-weight: 700;
+}
+.total-row {
+display: flex; justify-content: space-between; align-items: baseline;
+border-top: 2px solid var(--line); margin-top: 12px; padding-top: 12px;
+font-size: 16px;
+}
+.total-row .amount { font-size: 22px; font-weight: 700;}
+.memo-label { display: block; font-size: 13.5px; font-weight: 700; margin: 16px 0 6px;}
+textarea.out, textarea.memo {
+width: 100%; border: 1.5px solid var(--line); border-radius: 10px;
+background: var(--surface-2); padding: 10px 12px; font-size: 14.5px; line-height: 1.6;
+}
+textarea.memo { min-height: 58px; resize: vertical;}
+textarea.out { min-height: 130px; margin-top: 6px;}
+.btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;}
+.btn-primary {
+flex: 1; min-height: 52px; border: none; border-radius: 999px;
+background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 16px; padding: 12px 16px;
+}
+.btn-ghost {
+min-height: 52px; border: 1.5px solid var(--line); border-radius: 999px;
+background: var(--surface); font-weight: 700; font-size: 15px; padding: 12px 18px; color: var(--ink-soft);
+}
+.copy-msg { font-size: 13.5px; color: var(--ok); min-height: 20px; margin: 8px 0 0; font-weight: 700;}
+
+/* palette */
+.palette-grid {
+display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr;
+gap: 8px; margin-bottom: 6px;
+}
+.slot {
+border: 2px dashed var(--line); border-radius: 12px; background: var(--surface-2);
+min-height: 108px; padding: 10px; text-align: left; display: flex; flex-direction: column; gap: 4px;
+width: 100%;
+}
+.slot.s1 { grid-column: 1; grid-row: 1; }
+.slot.s2 { grid-column: 1; grid-row: 2; }
+.slot.s3 { grid-column: 2; grid-row: 1 / span 2; }
+.slot.s4 { grid-column: 3; grid-row: 1; }
+.slot.s5 { grid-column: 3; grid-row: 2; }
+.slot .snum {
+width: 26px; height: 26px; border-radius: 999px; background: var(--accent); color: var(--accent-ink);
+display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex: none;
+}
+.slot .sprod { font-size: 13.5px; line-height: 1.45; overflow-wrap: anywhere; flex: 1;}
+.slot .sempty { color: var(--muted); font-size: 13px;}
+.slot.filled { border-style: solid; border-color: var(--accent); background: var(--surface);}
+.slot.active { outline: 3px solid var(--accent); outline-offset: 1px;}
+.slot .sclear {
+align-self: flex-end; min-height: 36px; min-width: 44px; border: none; background: transparent;
+color: var(--danger); font-size: 13px; font-weight: 700; padding: 4px 6px;
+}
+
+/* mobile sheet trigger (sits in the sticky toolbar, never covers the list) */
+.sheet-open-btn {
+display: none; min-height: 48px; padding: 10px 18px; border: none; border-radius: 999px;
+background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 15px;
+}
+@media (max-width: 900px) {
+.sheet-open-btn { display: block; width: 100%; margin-top: 10px;}
+.panel { position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 50;
+max-height: 86vh; overflow-y: auto; border-radius: 18px 18px 0 0;
+transform: translateY(105%); transition: transform 0.22s ease;}
+.panel.sheet-open { transform: translateY(0);}
+.sheet-close-row { display: flex!important;}
+.wrap { padding-bottom: 40px;}
+}
+.sheet-close-row { display: none; justify-content: flex-end; padding: 8px 8px 0;}
+.sheet-close-row button {
+min-height: 44px; padding: 8px 16px; border: none; border-radius: 999px;
+background: var(--surface-2); font-weight: 700; color: var(--ink-soft);
+}
+.face-slot{border:2px dashed var(--line);border-radius:12px;background:var(--surface-2);padding:10px;text-align:left;width:100%}.face-slot.filled{border-style:solid;border-color:var(--accent);background:var(--surface)}.face-slot.active{outline:3px solid var(--accent);outline-offset:1px}.face-slot input{width:100%;margin-top:6px;min-height:40px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-size:13.5px}
+.faceset-switch{display:flex;gap:8px;margin:0 0 8px}
+.faceset-switch button{flex:1;min-height:48px;padding:8px 10px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface-2);font-weight:700;font-size:15px;color:var(--ink-soft)}
+.faceset-switch button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.face-choice{display:block;width:100%;text-align:left;border:2px solid var(--line);border-radius:12px;background:var(--surface-2);padding:10px 12px;margin-bottom:8px;min-height:52px}
+.face-choice.active{border-color:var(--accent);background:var(--surface);outline:2px solid var(--accent);outline-offset:1px}
+.face-choice .fc-title{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+.face-choice .fc-badge{flex:none;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:1px 10px;font-size:12px;font-weight:700}
+.face-choice .fc-badge.off{background:var(--chip);color:var(--ink-soft)}
+.face-choice .fc-sum{font-size:13px;color:var(--ink-soft);line-height:1.5;overflow-wrap:anywhere}
+.search-results-head { font-size: 15px; font-weight: 700; margin: 4px 0 10px;}
+.face-slot .fmemo { display: block; margin-top: 6px; font-size: 13px; color: var(--ink-soft); background: var(--surface-2); border-radius: 8px; padding: 6px 8px; overflow-wrap: anywhere;}
+.face-slot .fopen-note { display: block; margin-top: 4px; font-size: 12.5px; color: var(--accent); font-weight: 700;}
+
+/* ---------- product picker (opens from a face / palette slot) ---------- */
+.picker { position: fixed; inset: 0; z-index: 90; display: none; align-items: flex-end; justify-content: center;}
+.picker.open { display: flex;}
+.picker-backdrop { position: absolute; inset: 0; background: rgba(23, 16, 28, 0.55);}
+.picker-sheet {
+position: relative; width: 100%; max-width: 600px; max-height: 92vh;
+display: flex; flex-direction: column;
+background: var(--surface); border: 1px solid var(--line); border-bottom: none;
+border-radius: 18px 18px 0 0; box-shadow: var(--shadow); overflow: hidden;
+}
+@media (min-width: 700px) {
+.picker { align-items: center; padding: 24px 16px;}
+.picker-sheet { border-bottom: 1px solid var(--line); border-radius: 18px; max-height: 88vh;}
+}
+.picker-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px;}
+.picker-head h2 { font-size: 17px; margin: 0; flex: 1; min-width: 0; line-height: 1.45;}
+.picker-head .picker-x {
+flex: none; min-height: 44px; padding: 8px 14px; border: none; border-radius: 999px;
+background: var(--surface-2); font-weight: 700; color: var(--ink-soft);
+}
+.picker-sub { margin: 0; padding: 0 16px 10px; font-size: 13.5px; color: var(--muted);}
+.picker-search { padding: 0 16px 10px;}
+.picker-search input {
+width: 100%; min-height: 48px; padding: 10px 14px;
+border: 1.5px solid var(--line); border-radius: 999px; background: var(--surface-2); font-size: 16px;
+}
+.picker-search input:focus { outline: 2px solid var(--accent); outline-offset: 1px;}
+.picker-list { overflow-y: auto; padding: 0 16px 8px; -webkit-overflow-scrolling: touch;}
+.picker-cat { font-size: 13px; font-weight: 700; color: var(--accent); margin: 14px 0 6px;}
+.picker-cat:first-child { margin-top: 2px;}
+.pick-row {
+display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+min-height: 54px; padding: 10px 12px; margin-bottom: 6px;
+border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface);
+font-size: 15px; line-height: 1.45;
+}
+.pick-row .pname { flex: 1; min-width: 0; overflow-wrap: anywhere;}
+.pick-row .pick-check {
+flex: none; display: none; background: var(--accent); color: var(--accent-ink);
+border-radius: 999px; padding: 2px 10px; font-size: 12.5px; font-weight: 700;
+}
+.pick-row.selected { border-color: var(--accent); background: var(--accent-soft);}
+.pick-row.selected .pick-check { display: inline-block;}
+.picker-empty { color: var(--muted); font-size: 14px; padding: 12px 0;}
+.picker-foot { border-top: 1px solid var(--line); padding: 12px 16px 16px; background: var(--surface);}
+.picker-foot label { display: block; font-size: 13.5px; font-weight: 700; margin-bottom: 6px;}
+.picker-foot textarea {
+width: 100%; min-height: 52px; resize: vertical;
+border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface-2);
+padding: 10px 12px; font-size: 15px; line-height: 1.55;
+}
+.picker-note { font-size: 13px; color: var(--muted); margin: 6px 0 0;}
+.picker-btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;}
+.picker-btns .btn-primary { flex: 1; min-width: 180px;}
+.picker-clear {
+min-height: 52px; border: none; background: transparent; color: var(--danger);
+font-weight: 700; font-size: 14.5px; padding: 10px 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+.panel,.chev { transition: none;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="page-head">
+<h1>お客様ごとの使用履歴 ― 商品を選ぶ</h1>
+<p>このリストは<strong>仕入れ先（wistaria／BASEショップ）</strong>の商品 <strong>101点</strong>です。お店の販売金額を計算するためのものではありません。<strong>いつ・どのお客様に・どの商品をどう使ったか</strong>を、お客様ごとの履歴として残すために、商品名を手入力せずここから選んで記録します。カテゴリーの並びは仕入れ先ショップの左メニューと同じ順番です。品番のついた商品だけを載せています（診断・メイクレッスンなどのサービスは含みません）。</p>
+<p style="margin-top:8px">全体の形は <strong>プランC＋スプレッドシート連携（GAS連携）</strong> を想定しています。スマホでもパソコンでも同じ履歴を確認できるようにするための試作で、この画面は「履歴を書くときに商品を選ぶ」部分です。この試作では保存はされません。</p>
+</header>
+
+<div class="toolbar">
+<div class="search-row">
+<div class="search-box">
+<input id="search" type="search" inputmode="search" placeholder="品番・商品名でさがす（例：448、リップ）" aria-label="商品を検索" />
+<button class="search-clear" id="searchClear" aria-label="検索を消す">×</button>
+</div>
+</div>
+<div class="mode-row">
+<div class="seg" role="group" aria-label="タップした商品の入れ先">
+<button id="modeList" aria-pressed="true">使用商品へ</button>
+<button id="modePalette" aria-pressed="false">パレットへ</button>
+<button id="modeFace" aria-pressed="false">顔チャートへ</button>
+</div>
+<span class="mode-note" id="modeNote">タップで「この日に使った商品」に入ります</span>
+<div class="expand-btns">
+<button id="openAll">すべて開く</button>
+<button id="closeAll">すべて閉じる</button>
+</div>
+</div>
+<button class="sheet-open-btn" id="openSheet">履歴・パレット・顔チャートを開く（<span id="barCount">0</span>件入力済み）</button>
+</div>
+
+<div class="layout">
+<main id="browse" aria-label="商品カテゴリー一覧"></main>
+
+<aside class="panel" id="panel" aria-label="使用履歴">
+<div class="sheet-close-row"><button id="sheetClose">閉じる</button></div>
+<div class="panel-tabs" role="tablist">
+<button role="tab" id="tabList" aria-selected="true">履歴を書く <span id="tabListCount"></span></button>
+<button role="tab" id="tabPalette" aria-selected="false">パレット・顔</button>
+</div>
+
+<div class="panel-body" id="paneList">
+<h2>使用履歴を書く</h2>
+<p class="hint">お客様と日付を入れて、その日に使った商品を選んでください。金額の集計はしません ― 履歴として残すための記録です。</p>
+<label class="memo-label" for="custName">お客様</label>
+<input id="custName" type="text" list="custList" placeholder="例：山田様" style="width:100%;min-height:48px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface-2)" />
+<datalist id="custList"><option value="島田様"></option><option value="幸田様"></option><option value="佐久間様"></option></datalist>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<div style="flex:1;min-width:140px"><label class="memo-label" for="recDate">日付</label><input id="recDate" type="date" value="2026-11-16" style="width:100%;min-height:48px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface-2)" /></div>
+<div style="flex:1;min-width:140px"><label class="memo-label" for="recKind">区分</label><select id="recKind" style="width:100%;min-height:48px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface-2)"><option>ご来店</option><option>ネット注文</option><option>お土産・プレゼント</option><option>その他</option></select></div>
+</div>
+<h2 style="margin-top:18px">この日に使った商品</h2>
+<div id="selList"></div>
+<h2 style="margin-top:18px">顔画像（この記録で使うもの）</h2>
+<p class="hint">顔画像はお客様1人につき2種類まで持てます。この記録では、どちらの顔画像を使うか選んでください（中身は「パレット・顔」タブで入力します）。</p>
+<div id="faceChoice"></div>
+<label class="memo-label" for="memo">備考（任意）</label>
+<textarea class="memo" id="memo" placeholder="例：YR2で血色を上げた／リップはあまりつけない など、その日の様子"></textarea>
+<label class="memo-label" for="outText">履歴テキスト（コピー用）</label>
+<textarea class="out" id="outText" readonly></textarea>
+<div class="btn-row">
+<button class="btn-primary" id="copyList">テキストをコピー</button>
+<button class="btn-ghost" id="clearList">全部消す</button>
+</div>
+<p class="copy-msg" id="copyMsgList" role="status"></p>
+</div>
+
+<div class="panel-body" id="panePalette" hidden>
+<h2>カラーパレット（5色）― 履歴ごとに入力</h2>
+<p class="hint">枠をタップすると商品一覧が開きます。一覧から1つタップして選び、OKを押すとその枠に入ります。番号の位置は紙のカルテと同じ並びです（左上1・左下2・真ん中3・右上4・右下5）。</p>
+<div class="palette-grid" id="paletteGrid"></div>
+<h2 style="margin-top:20px">顔チャート（4か所）― お客様ごとに2種類まで</h2>
+<p class="hint">顔画像は1人につき2種類まで持てます。下のボタンで「顔画像1」「顔画像2」を切り替えて、それぞれ別々に中身を入れてください。履歴を書くときは、「履歴を書く」タブでどちらの顔画像を使うか選びます。</p>
+<div class="faceset-switch" role="group" aria-label="顔画像の切り替え">
+<button id="faceSetBtn0" aria-pressed="true">顔画像 1</button>
+<button id="faceSetBtn1" aria-pressed="false">顔画像 2</button>
+</div>
+<p class="hint" id="faceSetSummary" style="margin-bottom:10px"></p>
+<p class="hint">枠をタップすると、いま表示している顔画像のその場所に入れる商品の一覧が開きます。一覧から1つタップして選び、その下の備考欄に書くことがあれば書いて、OKを押すと入ります。備考は、書いた時だけ履歴に出ます。空のままOKすると、備考は出ません。</p>
+<div id="faceGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+<label class="memo-label" for="palText">履歴テキスト（パレット・顔チャート分）</label>
+<textarea class="out" id="palText" readonly></textarea>
+<div class="btn-row">
+<button class="btn-primary" id="copyPal">テキストをコピー</button>
+<button class="btn-ghost" id="clearPal">全部消す</button>
+</div>
+<p class="copy-msg" id="copyMsgPal" role="status"></p>
+</div>
+</aside>
+</div>
+</div>
+
+
+
+<div class="picker" id="picker" hidden role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+<div class="picker-backdrop" id="pickerBackdrop"></div>
+<div class="picker-sheet">
+<div class="picker-head">
+<h2 id="pickerTitle">商品を選ぶ</h2>
+<button class="picker-x" id="pickerCloseTop">閉じる</button>
+</div>
+<p class="picker-sub" id="pickerSub"></p>
+<div class="picker-search">
+<input id="pickerSearch" type="search" inputmode="search" placeholder="品番・商品名でさがす（例：448、リップ）" aria-label="候補の商品を検索" />
+</div>
+<div class="picker-list" id="pickerList"></div>
+<div class="picker-foot">
+<div id="pickerMemoWrap">
+<label for="pickerMemo">備考（任意）</label>
+<textarea id="pickerMemo" placeholder="必要な時だけ書いてください"></textarea>
+<p class="picker-note">書いた時だけ、履歴に備考として出ます。空のままOKすると、備考は出ません。</p>
+</div>
+<div class="picker-btns">
+<button class="btn-primary" id="pickerOk">OK（この内容で入れる）</button>
+<button class="btn-ghost" id="pickerCancel">やめる</button>
+<button class="picker-clear" id="pickerClear">空にする</button>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+var DATA = [{"name": "ベース・メイク", "direct": [{"id": "149227834", "name": "611-Bダークピンク", "price": 3540}, {"id": "149227605", "name": "614-Yダークピンク", "price": 3540}], "children": [{"name": "メイクアップベース", "items": [{"id": "57568644", "name": "115-UVメイクアップベースリキッド ブルーベース", "price": 4505}, {"id": "57568595", "name": "116-UVメイクアップベースリキッド イエローベース", "price": 4505}]}, {"name": "ファンデーション", "items": [{"id": "57570202", "name": "113-B/D リキッドファンデーションUVモイスチュアフィニッシュ", "price": 3570}, {"id": "57570130", "name": "106-B/Y3 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57569986", "name": "105-B/Y2 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57569771", "name": "103-B/R3 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57569654", "name": "102-B/R2 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57569564", "name": "114-Y/D リキッドファンデーションUVモイスチュアフィニッシュ", "price": 3570}, {"id": "57569474", "name": "109-Y/R3 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57569271", "name": "108-Y/R2 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57568976", "name": "112-Y/Y3 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57568889", "name": "111-Y/Y2 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}]}, {"name": "ハイライト", "items": [{"id": "57575294", "name": "118-Y ハイライトキラキラフィニッシュ イエローベース", "price": 3025}, {"id": "57575048", "name": "117-B ハイライトキラキラフィニッシュ ブルーベース", "price": 3025}]}, {"name": "パウダー", "items": [{"id": "63657293", "name": "203-プレストパウダーナチュラル レフィル", "price": 2780}, {"id": "57575630", "name": "205-ラスターフィニッシングパウダー", "price": 4600}, {"id": "57575459", "name": "202-プレストパウダーナチュラル（パフ付き）", "price": 4430}]}, {"name": "ブルーベース", "items": [{"id": "72860542", "name": "467-B/PGラメ", "price": 1485}, {"id": "69951123", "name": "316-Bベーシックカラー", "price": 8716}, {"id": "63657882", "name": "608‐リップケアグロスナルージュ Bベージュ", "price": 3540}, {"id": "63657858", "name": "501-Bブライト24", "price": 3160}, {"id": "63657838", "name": "502-BYライト1", "price": 3160}, {"id": "63657797", "name": "504-Bソフト2", "price": 3160}, {"id": "63657658", "name": "464-B/Pibeラメ（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657648", "name": "462-冬夏B-2パール（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657642", "name": "458-B/dkGy-2（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657634", "name": "457-冬夏W-2パール・ラメ（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657628", "name": "456-冬PIBe-2（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657590", "name": "447-冬G-1ラメ（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657582", "name": "446-冬P-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657575", "name": "445-冬BR-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657564", "name": "444-冬RP-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657550", "name": "443-夏B-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657544", "name": "442-夏BR-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657529", "name": "441-夏W-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657482", "name": "440-夏PI-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "57575048", "name": "117-B ハイライトキラキラフィニッシュ ブルーベース", "price": 3025}, {"id": "57570202", "name": "113-B/D リキッドファンデーションUVモイスチュアフィニッシュ", "price": 3570}, {"id": "57570130", "name": "106-B/Y3 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57569986", "name": "105-B/Y2 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57569771", "name": "103-B/R3 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57569654", "name": "102-B/R2 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57568644", "name": "115-UVメイクアップベースリキッド ブルーベース", "price": 4505}]}, {"name": "イエローベース", "items": [{"id": "72860619", "name": "466-Y/OGラメ", "price": 1680}, {"id": "69951141", "name": "317-Yベーシックカラー", "price": 8716}, {"id": "63658423", "name": "465-Y/OPbeラメ（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658415", "name": "463-春秋V-1（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658406", "name": "461-Y-dkGy-2（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658399", "name": "460-春秋W-2（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658389", "name": "459-春PI-2（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658386", "name": "455-秋G-1ラメ（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658375", "name": "454-秋BR-1ラメ（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658368", "name": "453-秋GO-1（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658356", "name": "452-秋BR-1（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658355", "name": "451-春B-1 パール（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658341", "name": "450-春G-1パール（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658337", "name": "449-春W-1ラメ（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658323", "name": "448-秋O-1（ユニットカラー イエローベース）", "price": 1680}, {"id": "57575294", "name": "118-Y ハイライトキラキラフィニッシュ イエローベース", "price": 3025}, {"id": "57569564", "name": "114-Y/D リキッドファンデーションUVモイスチュアフィニッシュ", "price": 3570}, {"id": "57569474", "name": "109-Y/R3 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57569271", "name": "108-Y/R2 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57568976", "name": "112-Y/Y3 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57568889", "name": "111-Y/Y2 リキッドファンデーションUVモイスチュアフィニッシュ", "price": 4505}, {"id": "57568595", "name": "116-UVメイクアップベースリキッド イエローベース", "price": 4505}]}, {"name": "アイカラー＆チーク＆アイブロウ", "items": [{"id": "72860619", "name": "466-Y/OGラメ", "price": 1680}, {"id": "72860542", "name": "467-B/PGラメ", "price": 1485}, {"id": "63658423", "name": "465-Y/OPbeラメ（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658415", "name": "463-春秋V-1（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658406", "name": "461-Y-dkGy-2（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658399", "name": "460-春秋W-2（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658389", "name": "459-春PI-2（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658386", "name": "455-秋G-1ラメ（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658375", "name": "454-秋BR-1ラメ（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658368", "name": "453-秋GO-1（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658356", "name": "452-秋BR-1（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658355", "name": "451-春B-1 パール（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658341", "name": "450-春G-1パール（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658337", "name": "449-春W-1ラメ（ユニットカラー イエローベース）", "price": 1680}, {"id": "63658323", "name": "448-秋O-1（ユニットカラー イエローベース）", "price": 1680}, {"id": "63657658", "name": "464-B/Pibeラメ（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657648", "name": "462-冬夏B-2パール（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657642", "name": "458-B/dkGy-2（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657634", "name": "457-冬夏W-2パール・ラメ（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657628", "name": "456-冬PIBe-2（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657590", "name": "447-冬G-1ラメ（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657582", "name": "446-冬P-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657575", "name": "445-冬BR-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657564", "name": "444-冬RP-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657550", "name": "443-夏B-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657544", "name": "442-夏BR-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657529", "name": "441-夏W-1（ユニットカラー ブルーベース）", "price": 1680}, {"id": "63657482", "name": "440-夏PI-1（ユニットカラー ブルーベース）", "price": 1680}]}, {"name": "カラーパレット", "items": [{"id": "69951141", "name": "317-Yベーシックカラー", "price": 8716}, {"id": "69951123", "name": "316-Bベーシックカラー", "price": 8716}, {"id": "69951068", "name": "320-ツインカラーパレット", "price": 3560}, {"id": "63746449", "name": "315-FREE", "price": 8716}]}, {"name": "リップスティック", "items": [{"id": "63658547", "name": "510-YBライト3", "price": 3160}, {"id": "63658531", "name": "511-Yブライト4", "price": 3160}, {"id": "63658507", "name": "515-Yダル3", "price": 3160}, {"id": "63657858", "name": "501-Bブライト24", "price": 3160}, {"id": "63657838", "name": "502-BYライト1", "price": 3160}, {"id": "63657797", "name": "504-Bソフト2", "price": 3160}]}, {"name": "グロス", "items": [{"id": "85393732", "name": "610‐リップケアグロスナルージュ［クリアピンク］", "price": 3540}, {"id": "63746477", "name": "607-クリスタル", "price": 2750}, {"id": "63658582", "name": "609-リップケアグロスナルージュ Yベージュ", "price": 3540}, {"id": "63657882", "name": "608‐リップケアグロスナルージュ Bベージュ", "price": 3540}]}, {"name": "パーソナルメイクアップコレクション", "items": [{"id": "65388232", "name": "715-パーソナルメイクアップコレクション オリジナルポーチ付き", "price": 24769}, {"id": "65388314", "name": "716-パーソナルメイクアップコレクション More オリジナルポーチ付き", "price": 29774}]}]}, {"name": "スキンケア・基礎化粧品", "direct": [{"id": "72860364", "name": "154-ココ デ ヴァンモイスチャライザー ミルキィローション（保湿乳液） トライアル", "price": 935}], "children": [{"name": "化粧水＆美容液", "items": [{"id": "63746652", "name": "150 ココ デ ヴァン エッセンス", "price": 8980}, {"id": "72860243", "name": "153-ココ デ ヴァン モイスチャライザーミルキィローション（保湿乳液）", "price": 5660}, {"id": "63746544", "name": "151 ココ デ ヴァン モイスチャライザーローション（保湿化粧水）", "price": 4560}, {"id": "63746524", "name": "152 ココデヴァントライアルセット", "price": 1980}]}]}, {"name": "ツール", "direct": [], "children": [{"name": "プロツール", "items": []}, {"name": "スポンジ&パフ", "items": [{"id": "64653984", "name": "925-パウダー用パフ", "price": 870}, {"id": "57575809", "name": "959-ラスターフィニッシングパウダー専用パフ", "price": 790}, {"id": "57575510", "name": "929-プレストパウダーナチュラル専用パフ", "price": 525}, {"id": "57574907", "name": "924-リキッドファンデーション用菱形スポンジ（4個入）", "price": 1366}]}, {"name": "ブラシ&チップ", "items": [{"id": "64653935", "name": "911-チップ", "price": 1520}, {"id": "64653869", "name": "901-フェイスブラシ", "price": 4995}, {"id": "64653857", "name": "902-小フェイスブラシ", "price": 4805}, {"id": "64653841", "name": "903-チークブラシ", "price": 4430}, {"id": "64653831", "name": "904-小チークブラシ", "price": 4300}, {"id": "64653821", "name": "905-ハイライトブラシ", "price": 3540}, {"id": "64653790", "name": "906-小ハイライトブラシ", "price": 3415}, {"id": "64653777", "name": "907-アイカラーブラシ", "price": 2910}, {"id": "64653762", "name": "940-アイカラーSブラシ", "price": 3030}, {"id": "64653739", "name": "908-小アイカラーブラシ", "price": 2780}, {"id": "64653731", "name": "941-小アイカラーSブラシ", "price": 2785}, {"id": "64653722", "name": "915-マルチ", "price": 2530}, {"id": "64653691", "name": "913-リップブラシ", "price": 2655}, {"id": "64653682", "name": "914-小リップブラシ", "price": 2530}, {"id": "64653675", "name": "942-アイカラーブラシSS", "price": 2275}, {"id": "64653665", "name": "909-眉コーム", "price": 2275}, {"id": "64653649", "name": "943-小アイカラーSSブラシ", "price": 2215}, {"id": "64653638", "name": "910-小眉コーム", "price": 2150}, {"id": "64653625", "name": "917-スクリュウ", "price": 1580}, {"id": "64653620", "name": "912-小チップ", "price": 1455}, {"id": "64653613", "name": "918-小スクリュウ", "price": 1520}, {"id": "64653607", "name": "932-携帯チップ", "price": 630}, {"id": "64653580", "name": "951-ブラシセット 大11本", "price": 34259}, {"id": "64653568", "name": "952-ブラシセット 小11本", "price": 30852}]}, {"name": "パレット容器", "items": [{"id": "63747210", "name": "930-フリーパレット Sサイズ（4-5色用）", "price": 1865}, {"id": "63747146", "name": "939-フリーパレット SSサイズ", "price": 1090}]}, {"name": "その他ツール", "items": [{"id": "94017585", "name": "960-オリジナルポーチ", "price": 2420}, {"id": "64653580", "name": "951-ブラシセット 大11本", "price": 34259}, {"id": "64653568", "name": "952-ブラシセット 小11本", "price": 30852}, {"id": "64653555", "name": "919-ブラシケース 大", "price": 6325}, {"id": "64653544", "name": "920-ブラシケース 小", "price": 3795}]}]}];
+var PRODUCTS = {}; // id -> {id,name,price}
+DATA.forEach(function (g) {
+(g.direct || []).forEach(function (p) { PRODUCTS[p.id] = p;});
+(g.children || []).forEach(function (c) { c.items.forEach(function (p) { PRODUCTS[p.id] = p;});});
+});
+
+var cart = new Map(); // id -> qty
+var palette = [null, null, null, null, null];
+var faceLabels = ['ファンデーション', 'チーク', 'アイカラー', 'リップ'];
+/* 顔画像はお客様1人につき2種類まで。それぞれ独立に保持する */
+var faceSets = [
+{ items: [null, null, null, null], memos: ['', '', '', ''] },
+{ items: [null, null, null, null], memos: ['', '', '', ''] }
+];
+var activeFaceSet = 0; /* パレット・顔タブで編集中の顔画像 */
+var recordFaceSet = 0; /* この記録で使う顔画像（0 / 1 / -1=使わない） */
+var face = faceSets[0].items;
+var faceMemos = faceSets[0].memos;
+var activeSlot = 0;
+var activeFace = 0;
+var mode = "list"; // 'list' | 'palette'
+var panelTab = "list";
+
+function yen(n) { return "¥" + n.toLocaleString("ja-JP");}
+function esc(s) {
+return String(s).replace(/[&<>"']/g, function (c) {
+return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c];
+});
+}
+
+/* ---------- browse rendering ---------- */
+var browse = document.getElementById("browse");
+
+function prodRow(p, pathLabel) {
+var inCart = cart.has(p.id);
+var qty = inCart? cart.get(p.id): 0;
+var html = '<div class="prod' + (inCart? " in-cart": "") + '" data-pid="' + p.id + '">';
+html += '<button class="prod-main" data-add="' + p.id + '" aria-label="' + esc(p.name) + ' を選ぶ">';
+html += '<span class="pname">' + (pathLabel? '<span class="cat-path">' + esc(pathLabel) + "</span>": "") + esc(p.name) + "</span>";
+html += '<span class="plus" aria-hidden="true">＋</span>';
+html += "</button>";
+html += '<span class="stepper"><button data-dec="' + p.id + '" aria-label="個数を減らす">−</button><span class="qty">' + qty + '</span><button data-inc="' + p.id + '" aria-label="個数を増やす">＋</button></span>';
+html += "</div>";
+return html;
+}
+
+function renderBrowse() {
+var html = "";
+DATA.forEach(function (g, gi) {
+var total = (g.direct || []).length;
+(g.children || []).forEach(function (c) { total += c.items.length;});
+html += '<section class="group' + (gi === 0? " open": "") + '" data-group="' + gi + '">';
+html += '<button class="group-head" data-toggle-group="' + gi + '" aria-expanded="' + (gi === 0) + '"><span class="gname">' + esc(g.name) + '</span><span class="count-chip">' + total + '件</span><span class="chev" aria-hidden="true">▾</span></button>';
+html += '<div class="group-body">';
+if ((g.direct || []).length) {
+if ((g.children || []).length) html += '<p class="direct-label">' + esc(g.name) + "（直下の商品）</p>";
+g.direct.forEach(function (p) { html += prodRow(p, null);});
+}
+(g.children || []).forEach(function (c, ci) {
+var key = gi + "-" + ci;
+html += '<div class="cat" data-cat="' + key + '">';
+html += '<button class="cat-head" data-toggle-cat="' + key + '"><span class="cname">' + esc(c.name) + '</span><span class="count-chip">' + c.items.length + '件</span><span class="chev" aria-hidden="true">▾</span></button>';
+html += '<div class="cat-body">';
+if (!c.items.length) html += '<p class="empty-note">現在、このカテゴリーの商品はありません。</p>';
+c.items.forEach(function (p) { html += prodRow(p, null);});
+html += "</div></div>";
+});
+html += "</div></section>";
+});
+browse.innerHTML = html;
+}
+
+function renderSearch(q) {
+var ql = q.toLowerCase();
+var hits = [];
+DATA.forEach(function (g) {
+(g.direct || []).forEach(function (p) { if (p.name.toLowerCase().indexOf(ql) >= 0) hits.push({ p: p, path: g.name});});
+(g.children || []).forEach(function (c) {
+c.items.forEach(function (p) { if (p.name.toLowerCase().indexOf(ql) >= 0) hits.push({ p: p, path: g.name + " ＞ " + c.name});});
+});
+});
+// de-duplicate by product id, keep first path
+var seen = {}, uniq = [];
+hits.forEach(function (h) { if (!seen[h.p.id]) { seen[h.p.id] = 1; uniq.push(h);}});
+var html = '<p class="search-results-head">「' + esc(q) + "」の検索結果：" + uniq.length + "件</p>";
+if (!uniq.length) html += '<p class="empty-note">見つかりませんでした。品番の一部や、名前の一部でお試しください。</p>';
+html += '<section class="group open"><div class="group-body" style="display:block;border-top:none">';
+uniq.forEach(function (h) { html += prodRow(h.p, h.path);});
+html += "</div></section>";
+browse.innerHTML = html;
+}
+
+/* ---------- selection / palette rendering ---------- */
+var selList = document.getElementById("selList");
+var outText = document.getElementById("outText");
+var memoEl = document.getElementById("memo");
+var palText = document.getElementById("palText");
+var paletteGrid = document.getElementById("paletteGrid");
+
+function cartTotals() {
+var count = 0;
+cart.forEach(function (qty, id) { count += qty;});
+return { count: count, sum: 0};
+}
+
+function anyFaceFilled() {
+return faceSets.some(function (s) { return s.items.some(Boolean); });
+}
+
+function faceSetLines(si) {
+var set = faceSets[si];
+var fLines = [];
+set.items.forEach(function (id, i) { if (id) { var s = faceLabels[i] + "：" + PRODUCTS[id].name; var m = (set.memos[i] || "").trim(); if (m) s += "（" + m + "）"; fLines.push(s); }});
+if (!fLines.length) return [];
+return ["【顔チャート（顔画像" + (si + 1) + "）】"].concat(fLines);
+}
+
+function paletteLines() {
+var palLines = [];
+palette.forEach(function (id, i) { if (id) palLines.push((i + 1) + "：" + PRODUCTS[id].name);});
+if (!palLines.length) return [];
+return ["【パレット】"].concat(palLines);
+}
+
+function buildListText() {
+var cust = document.getElementById("custName");
+var dateEl = document.getElementById("recDate");
+var kindEl = document.getElementById("recKind");
+var hasHead = cust && (cust.value.trim() || dateEl.value);
+if (!cart.size && !memoEl.value.trim() && !palette.some(Boolean) && !anyFaceFilled() && !hasHead) return "";
+var lines = [];
+if (hasHead) lines.push((dateEl.value || "") + "　" + (cust.value.trim() || "（お客様未入力）") + "　" + kindEl.value);
+if (cart.size) {
+lines.push("【この日に使った商品】");
+cart.forEach(function (qty, id) { lines.push("・" + PRODUCTS[id].name + (qty > 1 ? " ×" + qty : "")); });
+}
+lines = lines.concat(paletteLines());
+/* 記録には、選んだ顔画像だけが入る */
+if (recordFaceSet >= 0) lines = lines.concat(faceSetLines(recordFaceSet));
+if (memoEl.value.trim()) lines.push("備考：" + memoEl.value.trim());
+return lines.join("\n");
+}
+
+function buildPalText() {
+/* パレット・顔タブ側のテキストには、保持している2種類の顔画像を両方出す */
+var lines = paletteLines();
+faceSets.forEach(function (s, si) { lines = lines.concat(faceSetLines(si)); });
+return lines.join("\n");
+}
+
+function renderPanel() {
+var t = cartTotals();
+var palFilled = palette.filter(Boolean).length;
+var faceFilled = faceSets.reduce(function (acc, s) { return acc + s.items.filter(Boolean).length;}, 0);
+document.getElementById("barCount").textContent = t.count + palFilled + faceFilled;
+document.getElementById("tabListCount").textContent = t.count? "（" + t.count + "点）": "";
+if (!cart.size) {
+selList.innerHTML = '<p class="sel-empty">まだ選ばれていません。リストから、その日に使った商品をタップしてください。</p>';
+} else {
+var html = "";
+cart.forEach(function (qty, id) {
+var p = PRODUCTS[id];
+html += '<div class="sel-item"><div class="sname">' + esc(p.name) + '</div><div class="srow">';
+html += '<span class="stepper" style="display:flex;align-items:center;gap:2px"><button data-dec="' + id + '" aria-label="個数を減らす">−</button><span class="qty">' + qty + '</span><button data-inc="' + id + '" aria-label="個数を増やす">＋</button></span>';
+html += '<button class="remove" data-remove="' + id + '">外す</button>';
+html += "</div></div>";
+});
+selList.innerHTML = html;
+}
+outText.value = buildListText();
+
+var slotPos = ["左上", "左下", "真ん中", "右上", "右下"];
+var phtml = "";
+palette.forEach(function (id, i) {
+var p = id? PRODUCTS[id]: null;
+phtml += '<button class="slot s' + (i + 1) + (p? " filled": "") + (panelTab === "palette" && activeSlot === i? " active": "") + '" data-slot="' + i + '">';
+phtml += '<span style="display:flex;align-items:center;gap:8px"><span class="snum">' + (i + 1) + '</span><span style="font-size:12.5px;color:var(--muted)">' + slotPos[i] + "</span></span>";
+phtml += p? '<span class="sprod">' + esc(p.name) + '</span>'
+: '<span class="sprod sempty">未入力（タップして選択）</span>';
+if (p) phtml += '<span class="sclear" data-slot-clear="' + i + '" role="button" aria-label="枠' + (i + 1) + 'を空にする">消す</span>';
+phtml += "</button>";
+});
+paletteGrid.innerHTML = phtml;
+var fg = document.getElementById("faceGrid");
+if (fg) {
+var fhtml = "";
+face.forEach(function (id, i) {
+var fp = id ? PRODUCTS[id] : null;
+fhtml += '<div class="face-slot' + (fp ? " filled" : "") + (panelTab === "palette" && mode === "face" && activeFace === i ? " active" : "") + '">';
+fhtml += '<button data-face="' + i + '" style="border:none;background:transparent;text-align:left;width:100%;padding:0;min-height:44px"><strong style="font-size:14px">' + faceLabels[i] + '</strong><br><span style="font-size:13.5px">' + (fp ? esc(fp.name) : "未入力") + '</span><span class="fopen-note">タップすると商品一覧が開きます</span></button>';
+var fmemo = (faceMemos[i] || "").trim();
+if (fp && fmemo) fhtml += '<span class="fmemo">備考：' + esc(fmemo) + '</span>';
+if (fp) fhtml += '<button data-face-clear="' + i + '" style="border:none;background:transparent;color:var(--danger);font-weight:700;min-height:36px;padding:4px">消す</button>';
+fhtml += '</div>';
+});
+fg.innerHTML = fhtml;
+}
+/* 顔画像の切り替えボタン（編集中のセットを表示） */
+[0, 1].forEach(function (si) {
+var btn = document.getElementById("faceSetBtn" + si);
+if (!btn) return;
+var cnt = faceSets[si].items.filter(Boolean).length;
+btn.textContent = "顔画像 " + (si + 1) + "（" + cnt + "か所）";
+btn.setAttribute("aria-pressed", activeFaceSet === si);
+});
+var fsum = document.getElementById("faceSetSummary");
+if (fsum) {
+var other = faceSets[1 - activeFaceSet].items.filter(Boolean).length;
+fsum.textContent = "いま編集中：顔画像" + (activeFaceSet + 1) + "／もう一方（顔画像" + (2 - activeFaceSet) + "）は " + (other ? other + "か所入力済み" : "未入力") + " です。切り替えても中身は消えません。";
+}
+/* 記録で使う顔画像の選択肢 */
+var fc = document.getElementById("faceChoice");
+if (fc) {
+var chtml = "";
+faceSets.forEach(function (set, si) {
+var parts = [];
+set.items.forEach(function (id, i) { if (id) parts.push(faceLabels[i] + "：" + PRODUCTS[id].name); });
+chtml += '<button class="face-choice' + (recordFaceSet === si ? " active" : "") + '" data-face-choice="' + si + '" aria-pressed="' + (recordFaceSet === si) + '">';
+chtml += '<span class="fc-title">顔画像 ' + (si + 1) + (recordFaceSet === si ? '<span class="fc-badge">この記録で使用</span>' : "") + "</span>";
+chtml += '<span class="fc-sum">' + (parts.length ? esc(parts.join("／")) : "未入力（「パレット・顔」タブで入れられます）") + "</span>";
+chtml += "</button>";
+});
+chtml += '<button class="face-choice' + (recordFaceSet === -1 ? " active" : "") + '" data-face-choice="-1" aria-pressed="' + (recordFaceSet === -1) + '">';
+chtml += '<span class="fc-title">顔画像を使わない' + (recordFaceSet === -1 ? '<span class="fc-badge off">選択中</span>' : "") + "</span>";
+chtml += '<span class="fc-sum">この記録には顔チャートを入れません</span>';
+chtml += "</button>";
+fc.innerHTML = chtml;
+}
+if (mode === "face") modeNote.textContent = "タップで顔画像" + (activeFaceSet + 1) + "の「" + faceLabels[activeFace] + "」に入ります";
+outText.value = buildListText();
+palText.value = buildPalText();
+}
+
+function refreshProdStates() {
+document.querySelectorAll(".prod").forEach(function (row) {
+var id = row.getAttribute("data-pid");
+var inCart = cart.has(id);
+row.classList.toggle("in-cart", inCart);
+var q = row.querySelector(".qty");
+if (q) q.textContent = inCart? cart.get(id): 0;
+});
+}
+
+function renderAll() { renderPanel(); refreshProdStates();}
+
+/* ---------- actions ---------- */
+function addProduct(id) {
+if (mode === "face") {
+var fIdx = activeFace;
+face[activeFace] = id;
+var nf = face.indexOf(null);
+if (nf >= 0) activeFace = nf;
+setPanelTab("palette");
+renderPanel();
+modeNote.textContent = "顔画像" + (activeFaceSet + 1) + "の「" + faceLabels[fIdx] + "」に「" + PRODUCTS[id].name + "」が入りました";
+return;
+}
+if (mode === "palette") {
+var pIdx = activeSlot;
+palette[activeSlot] = id;
+var next = palette.indexOf(null);
+if (next >= 0) activeSlot = next;
+setPanelTab("palette");
+renderPanel();
+modeNote.textContent = "パレットの枠 " + (pIdx + 1) + " に「" + PRODUCTS[id].name + "」が入りました";
+return;
+}
+cart.set(id, (cart.get(id) || 0) + 1);
+renderAll();
+}
+function inc(id) { cart.set(id, (cart.get(id) || 0) + 1); renderAll();}
+function dec(id) {
+var q = (cart.get(id) || 0) - 1;
+if (q <= 0) cart.delete(id); else cart.set(id, q);
+renderAll();
+}
+
+document.addEventListener("click", function (e) {
+var t = e.target;
+var slotClear = t.closest("[data-slot-clear]");
+if (slotClear) {
+e.stopPropagation();
+palette[Number(slotClear.getAttribute("data-slot-clear"))] = null;
+activeSlot = Number(slotClear.getAttribute("data-slot-clear"));
+renderPanel();
+return;
+}
+var fclear = t.closest("[data-face-clear]");
+if (fclear) { face[Number(fclear.getAttribute("data-face-clear"))] = null; renderPanel(); return; }
+var fchoice = t.closest("[data-face-choice]");
+if (fchoice) { recordFaceSet = Number(fchoice.getAttribute("data-face-choice")); renderPanel(); return; }
+var fslot = t.closest("[data-face]");
+if (fslot) { activeFace = Number(fslot.getAttribute("data-face")); openPicker("face", activeFace); return; }
+var slot = t.closest("[data-slot]");
+if (slot) {
+activeSlot = Number(slot.getAttribute("data-slot"));
+openPicker("palette", activeSlot);
+return;
+}
+var add = t.closest("[data-add]");
+if (add) { addProduct(add.getAttribute("data-add")); return;}
+var i = t.closest("[data-inc]");
+if (i) { inc(i.getAttribute("data-inc")); return;}
+var d = t.closest("[data-dec]");
+if (d) { dec(d.getAttribute("data-dec")); return;}
+var r = t.closest("[data-remove]");
+if (r) { cart.delete(r.getAttribute("data-remove")); renderAll(); return;}
+var g = t.closest("[data-toggle-group]");
+if (g) {
+var sec = g.closest(".group");
+sec.classList.toggle("open");
+g.setAttribute("aria-expanded", sec.classList.contains("open"));
+return;
+}
+var c = t.closest("[data-toggle-cat]");
+if (c) { c.closest(".cat").classList.toggle("open"); return;}
+});
+
+/* mode + tabs */
+var modeNote = document.getElementById("modeNote");
+function setMode(m) {
+mode = m;
+document.getElementById("modeList").setAttribute("aria-pressed", m === "list");
+document.getElementById("modePalette").setAttribute("aria-pressed", m === "palette");
+var mf = document.getElementById("modeFace"); if (mf) mf.setAttribute("aria-pressed", m === "face");
+modeNote.textContent = m === "list" ? "タップで「この日に使った商品」に入ります" : (m === "face" ? "タップで顔画像" + (activeFaceSet + 1) + "の「" + faceLabels[activeFace] + "」に入ります" : "タップでパレットの枠 " + (activeSlot + 1) + " に入ります");
+}
+/* スマホ幅ではパネルは画面下のシートとして隠れているので、「パレットへ」「顔チャートへ」を押した時点でシートを開いて枠を見せる */
+function openSheetMobile() {
+if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
+document.getElementById("panel").classList.add("sheet-open");
+}
+}
+document.getElementById("modeList").addEventListener("click", function () { setMode("list");});
+document.getElementById("modePalette").addEventListener("click", function () { setMode("palette"); setPanelTab("palette"); openSheetMobile();});
+document.getElementById("modeFace").addEventListener("click", function () { setMode("face"); setPanelTab("palette"); openSheetMobile();});
+
+function setPanelTab(tab) {
+panelTab = tab;
+document.getElementById("tabList").setAttribute("aria-selected", tab === "list");
+document.getElementById("tabPalette").setAttribute("aria-selected", tab === "palette");
+document.getElementById("paneList").hidden = tab!== "list";
+document.getElementById("panePalette").hidden = tab!== "palette";
+renderPanel();
+}
+document.getElementById("tabList").addEventListener("click", function () { setPanelTab("list");});
+document.getElementById("tabPalette").addEventListener("click", function () { setPanelTab("palette");});
+
+/* expand / collapse */
+document.getElementById("openAll").addEventListener("click", function () {
+document.querySelectorAll(".group").forEach(function (g) { g.classList.add("open");});
+document.querySelectorAll(".cat").forEach(function (c) { c.classList.add("open");});
+});
+document.getElementById("closeAll").addEventListener("click", function () {
+document.querySelectorAll(".group").forEach(function (g) { g.classList.remove("open");});
+document.querySelectorAll(".cat").forEach(function (c) { c.classList.remove("open");});
+});
+
+/* search */
+var searchEl = document.getElementById("search");
+var searchClear = document.getElementById("searchClear");
+searchEl.addEventListener("input", function () {
+var q = searchEl.value.trim();
+searchClear.classList.toggle("show",!!q);
+if (q) renderSearch(q); else renderBrowse();
+refreshProdStates();
+});
+searchClear.addEventListener("click", function () {
+searchEl.value = "";
+searchClear.classList.remove("show");
+renderBrowse(); refreshProdStates(); searchEl.focus();
+});
+
+/* memo */
+memoEl.addEventListener("input", function () { outText.value = buildListText();});
+["custName","recDate","recKind"].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener("input", function(){ outText.value = buildListText(); palText.value = buildPalText(); }); });
+document.addEventListener("input", function(e){ var m = e.target.closest && e.target.closest("[data-face-memo]"); if(m){ faceMemos[Number(m.getAttribute("data-face-memo"))] = m.value; outText.value = buildListText(); palText.value = buildPalText(); } });
+
+/* copy */
+function copyText(text, msgEl) {
+function done() { msgEl.textContent = "コピーしました。カルテやメモに貼り付けできます。"; setTimeout(function () { msgEl.textContent = "";}, 3500);}
+if (!text) { msgEl.textContent = "まだ内容がありません。"; setTimeout(function () { msgEl.textContent = "";}, 2500); return;}
+if (navigator.clipboard && navigator.clipboard.writeText) {
+navigator.clipboard.writeText(text).then(done).catch(function () { fallback();});
+} else fallback();
+function fallback() {
+var ta = msgEl === document.getElementById("copyMsgList")? outText: palText;
+ta.removeAttribute("readonly"); ta.select();
+try { document.execCommand("copy"); done();} catch (err) { msgEl.textContent = "コピーできませんでした。欄の文章を長押しでコピーしてください。";}
+ta.setAttribute("readonly", "");
+}
+}
+document.getElementById("copyList").addEventListener("click", function () { copyText(buildListText(), document.getElementById("copyMsgList"));});
+document.getElementById("copyPal").addEventListener("click", function () { copyText(buildPalText(), document.getElementById("copyMsgPal"));});
+document.getElementById("clearList").addEventListener("click", function () { cart.clear(); memoEl.value = ""; renderAll();});
+document.getElementById("clearPal").addEventListener("click", function () { palette = [null, null, null, null, null]; faceSets.forEach(function (s) { s.items = [null, null, null, null]; s.memos = ["", "", "", ""]; }); face = faceSets[activeFaceSet].items; faceMemos = faceSets[activeFaceSet].memos; activeSlot = 0; activeFace = 0; renderPanel();});
+
+/* 顔画像1 / 顔画像2 の切り替え（編集中のセットを差し替えるだけ。中身はそれぞれ保持される） */
+function switchFaceSet(si) {
+activeFaceSet = si;
+face = faceSets[si].items;
+faceMemos = faceSets[si].memos;
+var nf = face.indexOf(null);
+activeFace = nf >= 0 ? nf : 0;
+if (mode === "face") setMode("face");
+renderPanel();
+}
+document.getElementById("faceSetBtn0").addEventListener("click", function () { switchFaceSet(0); });
+document.getElementById("faceSetBtn1").addEventListener("click", function () { switchFaceSet(1); });
+
+/* mobile sheet */
+var panel = document.getElementById("panel");
+document.getElementById("openSheet").addEventListener("click", function () { panel.classList.add("sheet-open");});
+document.getElementById("sheetClose").addEventListener("click", function () { panel.classList.remove("sheet-open");});
+
+/* ---------- product picker (face / palette slots) ---------- */
+var pickerEl = document.getElementById("picker");
+var pickerListEl = document.getElementById("pickerList");
+var pickerSearchEl = document.getElementById("pickerSearch");
+var pickerMemoEl = document.getElementById("pickerMemo");
+var pickerTarget = null; /* {type:'face'|'palette', index:n} */
+var pickerSelected = null; /* product id, tentative until OK */
+
+function pickerEntries() {
+/* unique products in menu order, with their category path */
+var seen = {}, out = [];
+DATA.forEach(function (g) {
+(g.direct || []).forEach(function (p) { if (!seen[p.id]) { seen[p.id] = 1; out.push({ p: p, path: g.name }); } });
+(g.children || []).forEach(function (c) {
+c.items.forEach(function (p) { if (!seen[p.id]) { seen[p.id] = 1; out.push({ p: p, path: g.name + " ＞ " + c.name }); } });
+});
+});
+return out;
+}
+
+function renderPickerList() {
+var q = pickerSearchEl.value.trim().toLowerCase();
+var entries = pickerEntries();
+if (q) entries = entries.filter(function (e) { return e.p.name.toLowerCase().indexOf(q) >= 0; });
+if (!entries.length) {
+pickerListEl.innerHTML = '<p class="picker-empty">見つかりませんでした。品番の一部や、名前の一部でお試しください。</p>';
+return;
+}
+var html = "", lastPath = null;
+entries.forEach(function (e) {
+if (e.path !== lastPath) { html += '<p class="picker-cat">' + esc(e.path) + "</p>"; lastPath = e.path; }
+html += '<button class="pick-row' + (pickerSelected === e.p.id ? " selected" : "") + '" data-pick="' + e.p.id + '"><span class="pname">' + esc(e.p.name) + '</span><span class="pick-check">選択中</span></button>';
+});
+pickerListEl.innerHTML = html;
+}
+
+function openPicker(type, index) {
+pickerTarget = { type: type, index: index };
+var title = document.getElementById("pickerTitle");
+var sub = document.getElementById("pickerSub");
+if (type === "face") {
+pickerSelected = face[index];
+pickerMemoEl.value = faceMemos[index] || "";
+document.getElementById("pickerMemoWrap").style.display = "";
+title.textContent = "顔画像" + (activeFaceSet + 1) + "の「" + faceLabels[index] + "」に入れる商品";
+sub.textContent = "商品一覧（仕入れ先の全商品）から1つタップして選んでください。その下に備考も書けます。";
+} else {
+pickerSelected = palette[index];
+document.getElementById("pickerMemoWrap").style.display = "none";
+title.textContent = "パレットの枠 " + (index + 1) + " に入れる商品";
+sub.textContent = "商品一覧（仕入れ先の全商品）から1つタップして選んでください。";
+}
+pickerSearchEl.value = "";
+renderPickerList();
+pickerEl.hidden = false;
+pickerEl.classList.add("open");
+document.body.style.overflow = "hidden";
+}
+function closePicker() {
+pickerEl.classList.remove("open");
+pickerEl.hidden = true;
+pickerTarget = null;
+pickerSelected = null;
+document.body.style.overflow = "";
+}
+pickerListEl.addEventListener("click", function (e) {
+var row = e.target.closest("[data-pick]");
+if (!row) return;
+pickerSelected = row.getAttribute("data-pick");
+pickerListEl.querySelectorAll(".pick-row").forEach(function (r) {
+r.classList.toggle("selected", r.getAttribute("data-pick") === pickerSelected);
+});
+});
+pickerSearchEl.addEventListener("input", renderPickerList);
+document.getElementById("pickerOk").addEventListener("click", function () {
+if (!pickerTarget) return;
+if (pickerTarget.type === "face") {
+face[pickerTarget.index] = pickerSelected;
+faceMemos[pickerTarget.index] = pickerMemoEl.value;
+activeFace = pickerTarget.index;
+} else {
+palette[pickerTarget.index] = pickerSelected;
+activeSlot = pickerTarget.index;
+}
+closePicker();
+renderPanel();
+});
+document.getElementById("pickerClear").addEventListener("click", function () {
+pickerSelected = null;
+pickerMemoEl.value = "";
+renderPickerList();
+});
+document.getElementById("pickerCancel").addEventListener("click", closePicker);
+document.getElementById("pickerCloseTop").addEventListener("click", closePicker);
+document.getElementById("pickerBackdrop").addEventListener("click", closePicker);
+document.addEventListener("keydown", function (e) { if (e.key === "Escape" && pickerTarget) closePicker(); });
+
+renderBrowse();
+renderAll();
+</script>
+</body>
+</html>

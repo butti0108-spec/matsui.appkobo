@@ -58,6 +58,8 @@
     padding:16px; margin:0 0 10px; cursor:pointer; min-height:64px;}
   .cust-row .nm{font-size:18px; font-weight:700;}
   .cust-row .fg{font-size:12.5px; color:var(--sub);}
+  .cust-row .tone{display:inline-block; margin-top:3px; font-size:13px; font-weight:700; color:var(--rose-deep);
+    background:var(--rose-soft); border:1px solid var(--line); border-radius:999px; padding:2px 9px;}
   .cust-row .last{font-size:13px; color:var(--sub); text-align:right; white-space:nowrap;}
   .cust-row .last b{display:block; font-size:14.5px; color:var(--ink);}
   .cust-row .cinfo{flex:1; min-width:0;}
@@ -155,8 +157,11 @@
   .skintone .st-label{font-size:15.5px; font-weight:700; color:var(--rose-deep);}
   .skintone .st-val{font-size:13.5px; font-weight:700; color:var(--sub);}
   .skintone .st-scale{display:flex; align-items:flex-start; gap:4px; margin-top:2px;}
-  .skintone .st-end{flex:none; font-size:17px; font-weight:700; color:var(--ink); line-height:30px; padding-top:1px;}
-  .skintone .st-track{position:relative; flex:1; height:84px; margin:0 10px;}
+  /* 両端の B / Y は金の角丸枠で囲んで目立たせる。枠の分だけトラックが狭くなるので、
+     トラック左右マージンを 10px→14px に広げ、端の目盛りの丸（半径15px）と枠が重ならないようにする。 */
+  .skintone .st-end{flex:none; font-size:17px; font-weight:700; color:var(--ink); line-height:28px;
+    border:1.5px solid #B49A5A; border-radius:8px; padding:0 6px; background:rgba(180,154,90,.08); text-align:center;}
+  .skintone .st-track{position:relative; flex:1; height:84px; margin:0 14px;}
   .skintone .st-line{position:absolute; left:0; right:0; top:39px; border-top:2px dotted #C4B0CC;}
   .skintone .st-boundary{position:absolute; top:0; height:100%; transform:translateX(-50%);
     display:flex; flex-direction:column; align-items:center; pointer-events:none;}
@@ -680,6 +685,14 @@ function skinToneOf(c){
   var n = Number(c ? c.skinTone : null);
   return (isFinite(n) && n >= 1 && n <= 5) ? Math.round(n) : null;
 }
+/* 表示用の肌の色ラベル（例「3（YR）」。未設定は null）。プロフィールとお客様一覧で使う。 */
+function skinToneLabel(c){
+  var v = skinToneOf(c);
+  if (v == null) return null;
+  var def = null;
+  SKIN_TONES.forEach(function(t){ if (t.v === v) def = t; });
+  return def ? (def.v + (def.sub || "")) : String(v);
+}
 /* CSVの「肌の色」セルを読む（数字でも、（BR）等の補助表記でも読める） */
 function parseSkinTone(s){
   var t = String(s == null ? "" : s).trim();
@@ -843,9 +856,11 @@ function renderCustList(){
     var thumb = c.photo
       ? '<img class="thumb" src="' + c.photo + '" alt="">'
       : '<span class="thumb-init">' + esc((c.name || "？").charAt(0)) + "</span>";
+    var toneLbl = skinToneLabel(c);
     html += '<div class="cust-row" data-cust="' + c.id + '">' + thumb +
       '<div class="cinfo"><div class="nm">' + esc(c.name) + ' 様</div>' +
-      (c.furigana ? '<div class="fg">' + esc(c.furigana) + "</div>" : "") + "</div>" +
+      (c.furigana ? '<div class="fg">' + esc(c.furigana) + "</div>" : "") +
+      (toneLbl ? '<div><span class="tone">肌色 ' + esc(toneLbl) + "</span></div>" : "") + "</div>" +
       '<div class="last">最終来店<b>' + (lv ? fmtDate(lv) : "—") + "</b></div></div>";
   });
   $("custList").innerHTML = html || '<p class="empty-msg">お客様が見つかりませんでした。</p>';
@@ -942,6 +957,8 @@ function renderProfile(c){
   if (c.phone) tr("電話", c.phone);
   if (c.address) tr("住所", c.address);
   if (c.email) tr("メール", c.email);
+  /* 肌の色は例外として、未設定でも「未設定」の行を出す（設定し忘れに気づけるように） */
+  tr("肌の色", skinToneLabel(c) || "未設定");
   var free = [];
   if (c.notes){
     String(c.notes).split(/\r?\n/).forEach(function(line){

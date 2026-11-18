@@ -144,6 +144,36 @@
   #faceGrid .slot .val{gap:6px;}
   #faceGrid .slot .val .sw{width:22px; height:22px;}
   #faceGrid .slot .val .nm{font-size:12.5px; line-height:1.3;}
+  /* 肌の色バー：紙カルテの「肌の色」スケールをそのまま再現する。
+     左端 B（1=BR）〜右端 Y（5=YY）。目盛りの位置は紙の実測どおり
+     （1: 0% / 2: 41.7% / 境目: 50.5% / 3: 59.3% / 4: 79.8% / 5: 100%）。
+     「境目」ラベルは補助表記（BY)(YR）の行に置くと390px幅で両側に重なるため、
+     境界線を下まで伸ばし、ラベルはトラック最下段の専用行に置く。 */
+  .skintone{max-width:660px; margin:0 auto 14px; background:var(--card); border:1.5px solid var(--line);
+    border-radius:16px; padding:10px 14px 12px; box-shadow:0 2px 8px rgba(128,112,176,.10);}
+  .skintone .st-head{display:flex; align-items:baseline; gap:10px;}
+  .skintone .st-label{font-size:15.5px; font-weight:700; color:var(--rose-deep);}
+  .skintone .st-val{font-size:13.5px; font-weight:700; color:var(--sub);}
+  .skintone .st-scale{display:flex; align-items:flex-start; gap:4px; margin-top:2px;}
+  .skintone .st-end{flex:none; font-size:17px; font-weight:700; color:var(--ink); line-height:30px; padding-top:1px;}
+  .skintone .st-track{position:relative; flex:1; height:84px; margin:0 10px;}
+  .skintone .st-line{position:absolute; left:0; right:0; top:39px; border-top:2px dotted #C4B0CC;}
+  .skintone .st-boundary{position:absolute; top:0; height:100%; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; pointer-events:none;}
+  .skintone .st-boundary i{display:block; width:1.5px; height:64px; background:#C0AEDB;}
+  .skintone .st-boundary span{font-size:10px; color:var(--sub); letter-spacing:.08em; margin-top:2px; white-space:nowrap;}
+  .skintone .st-tick{position:absolute; top:0; transform:translateX(-50%); width:44px; height:66px;
+    background:none; border:none; padding:0; cursor:pointer; font-family:inherit;
+    display:flex; flex-direction:column; align-items:center;}
+  .skintone .st-num{width:30px; height:30px; border-radius:50%; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; font-weight:700; color:var(--ink); background:#fff; border:1.5px solid var(--line);}
+  .skintone .st-bar{display:block; width:5px; height:15px; border-radius:2px; background:var(--ink); margin-top:2px; flex:none;}
+  .skintone .st-sub{font-size:11px; color:var(--sub); margin-top:2px; white-space:nowrap; line-height:1.2;}
+  .skintone .st-tick.on .st-num{background:var(--rose); border-color:var(--rose); color:#fff;
+    box-shadow:0 3px 9px rgba(128,112,176,.35);}
+  .skintone .st-tick.on .st-bar{background:#B49A5A;}
+  .skintone .st-tick.on .st-sub{color:var(--rose-deep); font-weight:700;}
   .palgrid{display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:1fr 1fr; gap:12px;}
   .palgrid .slot{min-height:104px;}
   /* 実物のカルテのパレット図の並び：左列 1・2／中央列 3（縦長）／右列 4・5 */
@@ -292,6 +322,7 @@
         <button type="button" data-face="0" class="on">顔チャート 1</button>
         <button type="button" data-face="1">顔チャート 2</button>
       </div>
+      <div class="skintone" id="skinToneBar"></div>
       <div class="facewrap">
         <img id="faceImg" class="faceimg" alt="顔チャートの図">
         <svg id="faceLines" class="facelines" aria-hidden="true"></svg>
@@ -631,6 +662,34 @@ var FACE_SLOT_DEFS = [
   { key:"foundation", label:"ファンデーション", pos:"左下", cats:CATS_FOUNDATION },
   { key:"lip",        label:"リップ",           pos:"右下", cats:CATS_LIP }
 ];
+/* ============================================================
+   肌の色：紙カルテの「肌の色」スケールをそのままバーにしたもの。
+   お客様ごとに1つだけ選ぶ（customer.skinTone = 1〜5 / 未選択は null）。
+   目盛りの位置（pct）は紙の実測：左端の目盛り1を 0%、右端の目盛り5を 100% として
+   2: 41.7% / 境目: 50.5% / 3: 59.3% / 4: 79.8%（4 は 3 と 5 の真ん中）。
+   ============================================================ */
+var SKIN_TONES = [
+  { v:1, pct:0,    sub:"（BR）" },
+  { v:2, pct:41.7, sub:"（BY）" },
+  { v:3, pct:59.3, sub:"（YR）" },
+  { v:4, pct:79.8, sub:"" },
+  { v:5, pct:100,  sub:"（YY）" }
+];
+var SKIN_BOUNDARY_PCT = 50.5;
+function skinToneOf(c){
+  var n = Number(c ? c.skinTone : null);
+  return (isFinite(n) && n >= 1 && n <= 5) ? Math.round(n) : null;
+}
+/* CSVの「肌の色」セルを読む（数字でも、（BR）等の補助表記でも読める） */
+function parseSkinTone(s){
+  var t = String(s == null ? "" : s).trim();
+  if (!t) return null;
+  if (/^[1-5]$/.test(t)) return Number(t);
+  var subs = { "BR":1, "BY":2, "YR":3, "YY":5 };
+  for (var k in subs){ if (t.indexOf(k) >= 0) return subs[k]; }
+  var m = t.match(/^[1-5]/);
+  return m ? Number(m[0]) : null;
+}
 /* 枠の商品一覧を取り出す（データは常に上の形にそろえてある前提） */
 function faceItemsOf(slot){
   if (!slot || !Array.isArray(slot.items)) return [];
@@ -664,6 +723,7 @@ function faceNormalizeSlot(slot){
 function faceNormalizeAll(){
   if (!Array.isArray(customers)) return;
   customers.forEach(function(c){
+    c.skinTone = skinToneOf(c);
     if (!Array.isArray(c.face)) return;
     c.face = c.face.map(function(chart){
       if (!chart) return chart;
@@ -1231,7 +1291,38 @@ function faceSlotHTML(slot){
   if (memo) html += '<div class="memo">' + esc(memo) + "</div>";
   return html || '<span class="none">（未入力）タップで選ぶ</span>';
 }
+/* 肌の色バー（顔画像の上）。ワンタップで単一選択、選択中の目盛りをもう一度タップすると解除。
+   保存は顔チャートと同じ faceSave（反映を先に済ませ、保存はベストエフォート）。 */
+function renderSkinTone(c){
+  var bar = $("skinToneBar");
+  if (!bar) return;
+  var cur = skinToneOf(c);
+  var curDef = null;
+  SKIN_TONES.forEach(function(t){ if (t.v === cur) curDef = t; });
+  var html = '<div class="st-head"><span class="st-label">肌の色</span>' +
+    '<span class="st-val">' + (curDef ? (curDef.v + (curDef.sub ? " " + curDef.sub : "")) : "未選択") + "</span></div>";
+  html += '<div class="st-scale"><span class="st-end">B</span><div class="st-track">' +
+    '<div class="st-line"></div>' +
+    '<div class="st-boundary" style="left:' + SKIN_BOUNDARY_PCT + '%"><i></i><span>境目</span></div>';
+  SKIN_TONES.forEach(function(t){
+    html += '<button type="button" class="st-tick' + (t.v === cur ? " on" : "") + '" data-tone="' + t.v +
+      '" style="left:' + t.pct + '%" aria-label="肌の色 ' + t.v + (t.sub || "") + '">' +
+      '<span class="st-num">' + t.v + '</span><i class="st-bar"></i>' +
+      '<span class="st-sub">' + (t.sub || "　") + "</span></button>";
+  });
+  html += '</div><span class="st-end">Y</span></div>';
+  bar.innerHTML = html;
+  Array.prototype.forEach.call(bar.querySelectorAll("[data-tone]"), function(el){
+    el.addEventListener("click", function(){
+      var v = Number(el.getAttribute("data-tone"));
+      c.skinTone = (skinToneOf(c) === v) ? null : v;
+      renderSkinTone(c);
+      faceSave();
+    });
+  });
+}
 function renderFace(c){
+  renderSkinTone(c);
   Array.prototype.forEach.call($("faceTabs").querySelectorAll("button"), function(b){
     b.classList.toggle("on", Number(b.getAttribute("data-face")) === state.faceIdx);
   });
@@ -1583,7 +1674,7 @@ function saveRegister(){
     id: "c-" + Date.now(), name: name, furigana: $("regFuri").value.trim(),
     birth: $("regBirth").value.trim(), address: $("regAddr").value.trim(),
     phone: $("regTel").value.trim(), email: $("regMail").value.trim(),
-    notes: $("regNotes").value.trim(),
+    notes: $("regNotes").value.trim(), skinTone: null,
     face: [emptyChart(), emptyChart()], history: []
   };
   customers.push(c); saveDB();
@@ -1830,7 +1921,7 @@ function ensureCustomer(id){
   var c = findCust(id);
   if (!c){
     c = { id: id, name: "", furigana: "", birth: "", address: "", phone: "", email: "", notes: "",
-          face: [emptyChart(), emptyChart()], history: [] };
+          skinTone: null, face: [emptyChart(), emptyChart()], history: [] };
     customers.push(c);
   }
   if (!Array.isArray(c.face) || !c.face.length) c.face = [emptyChart(), emptyChart()];
@@ -1844,6 +1935,8 @@ function applyImport(kind, objs){
       var c = ensureCustomer(o["顧客ID"]);
       c.name = o["名前"] || ""; c.furigana = o["フリガナ"] || ""; c.birth = o["生年月日"] || ""; c.address = o["住所"] || "";
       c.phone = o["電話"] || ""; c.email = o["メール"] || ""; c.notes = o["特記事項"] || "";
+      /* 「肌の色」列があるCSVだけ反映する（列のない古いCSVでは今の値を消さない） */
+      if ("肌の色" in o) c.skinTone = parseSkinTone(o["肌の色"]);
     });
   } else if (kind === "history"){
     var byCust = {};
@@ -1965,7 +2058,7 @@ function downloadCSV(filename, rows){
 }
 /* 顔写真（c.photo）はCSVに入れない（書き出し・取り込みの対象外。写真は端末内にだけ残る） */
 function exportCSVs(){
-  var HEAD = ["種別","顧客ID","名前","フリガナ","生年月日","住所","電話","メール","特記事項","日付","区分","商品","メイク時間","お土産・いただき物","割引・クーポン","備考","パレット1","パレット2","パレット3","パレット4","パレット5","使う顔チャート","チャート番号","場所","メモ"];
+  var HEAD = ["種別","顧客ID","名前","フリガナ","生年月日","住所","電話","メール","特記事項","日付","区分","商品","メイク時間","お土産・いただき物","割引・クーポン","備考","パレット1","パレット2","パレット3","パレット4","パレット5","使う顔チャート","チャート番号","場所","メモ","肌の色"];
   function rowOf(kind, kv){
     var r = HEAD.map(function(){ return ""; });
     r[0] = kind;
@@ -1979,7 +2072,8 @@ function exportCSVs(){
   customers.forEach(function(c){
     rows.push(rowOf("お客様", {
       "顧客ID": c.id, "名前": c.name, "フリガナ": c.furigana || "", "生年月日": c.birth,
-      "住所": c.address, "電話": c.phone, "メール": c.email, "特記事項": c.notes
+      "住所": c.address, "電話": c.phone, "メール": c.email, "特記事項": c.notes,
+      "肌の色": skinToneOf(c) != null ? String(skinToneOf(c)) : ""
     }));
   });
   customers.forEach(function(c){

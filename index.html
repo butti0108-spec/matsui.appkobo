@@ -114,19 +114,22 @@
   .palframe .hint{margin-left:auto; font-size:12.5px; color:var(--sub);}
   /* face chart & palette grids */
   .facegrid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-  /* face chart stage: face image underlay + slots at four corners */
-  .facewrap{position:relative; min-height:520px; max-width:660px; margin:0 auto;}
+  /* face chart stage: slots at the four corners (edges flush), face in the clear middle band,
+     thin leader lines link each slot to its rough face area.
+     Bottom slots are re-aligned by JS (drawFaceLines): tops flush at the illustration's
+     bottom edge (base of the neck), extending downward; the bottom:0 below is the fallback. */
+  .facewrap{position:relative; min-height:664px; max-width:660px; margin:0 auto;}
   .faceimg{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-    max-width:84%; max-height:46%; z-index:0; pointer-events:none; mix-blend-mode:multiply;}
+    max-width:88%; max-height:26%; z-index:0; pointer-events:none; mix-blend-mode:multiply;}
+  .facelines{position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none;}
   #faceGrid{display:block; position:absolute; inset:0;}
-  #faceGrid .slot{position:absolute; width:46.5%; max-height:44%; overflow-y:auto; z-index:1;
+  #faceGrid .slot{position:absolute; width:46.5%; max-height:36.5%; overflow-y:auto; z-index:1;
     box-shadow:0 2px 8px rgba(128,112,176,.10);}
   #faceGrid .slot[data-slot="eye"]{top:0; left:0;}
   #faceGrid .slot[data-slot="cheek"]{top:0; right:0;}
   #faceGrid .slot[data-slot="foundation"]{bottom:0; left:0;}
   #faceGrid .slot[data-slot="lip"]{bottom:0; right:0;}
-  @media (max-width:560px){ .facewrap{min-height:520px;} #faceGrid .slot{width:47.5%;}
-    .faceimg{top:53%; max-height:42%;} }
+  @media (max-width:560px){ #faceGrid .slot{width:47.5%;} }
   .slot{background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:13px 14px;
     min-height:118px; cursor:pointer; display:flex; flex-direction:column; gap:7px;}
   .slot .pos{font-size:12px; font-weight:700; color:var(--sub); letter-spacing:.06em;}
@@ -291,6 +294,7 @@
       </div>
       <div class="facewrap">
         <img id="faceImg" class="faceimg" alt="顔チャートの図">
+        <svg id="faceLines" class="facelines" aria-hidden="true"></svg>
         <div id="faceGrid" class="facegrid"></div>
       </div>
       <p class="muted" style="margin-top:12px">メモは任意です（書いた時だけ表示されます）。</p>
@@ -1245,7 +1249,113 @@ function renderFace(c){
   Array.prototype.forEach.call($("faceGrid").querySelectorAll("[data-slot]"), function(el){
     el.addEventListener("click", function(){ openFacePicker(el.getAttribute("data-slot")); });
   });
+  fitFaceSlots();
+  requestAnimationFrame(drawFaceLines);
+  setTimeout(drawFaceLines, 150);
 }
+/* 顔チャートの枠内フィット：商品名が長い・3件入っても、文字を段階的に小さくして
+   枠の中に全て表示する（文字数制限・省略はしない）。
+   第1段＝商品名とメモのフォントを 0.5px 刻みで下限（名前9px／メモ10px）まで縮める。
+   第2段＝下限でも入りきらない時だけ、舞台（.facewrap）を下へ広げて枠の上限を上げる。
+   舞台を広げると顔イラストは半分だけ下がるので、上段の枠は顔に被らず、下段の余白も広がる。
+   それでも入りきらない場合の最後の受け皿は、従来どおり枠内スクロール。 */
+function fitFaceSlots(){
+  var wrap = document.querySelector(".facewrap");
+  var grid = $("faceGrid");
+  if (!wrap || !grid) return;
+  var slots = Array.prototype.slice.call(grid.querySelectorAll(".slot"));
+  if (!slots.length) return;
+  wrap.style.height = "";
+  var NM_BASE = 12.5, NM_MIN = 9, MEMO_BASE = 13, MEMO_MIN = 10;
+  function over(s){ return s.scrollHeight > s.clientHeight + 1; }
+  slots.forEach(function(s){
+    s.style.maxHeight = "";
+    var nms = s.querySelectorAll(".nm"), memo = s.querySelector(".memo");
+    var size = NM_BASE;
+    function apply(){
+      Array.prototype.forEach.call(nms, function(n){ n.style.fontSize = size + "px"; });
+      if (memo) memo.style.fontSize = Math.max(MEMO_MIN, MEMO_BASE - (NM_BASE - size)) + "px";
+    }
+    apply();
+    while (over(s) && size > NM_MIN){
+      size = Math.max(NM_MIN, size - 0.5);
+      apply();
+    }
+  });
+  var bad = slots.filter(over);
+  if (!bad.length) return;
+  var img = $("faceImg");
+  if (!img) return;
+  var wr = wrap.getBoundingClientRect(), ir = img.getBoundingClientRect();
+  if (!ir.height) return;
+  var faceTop = ir.top - wr.top, faceBot = ir.bottom - wr.top, wrapH = wr.height;
+  var delta = 0;
+  var plan = [];
+  bad.forEach(function(s){
+    var key = s.getAttribute("data-slot");
+    var sr = s.getBoundingClientRect();
+    var need = s.scrollHeight - s.clientHeight; /* 枠の上限をあと何px広げれば全て入るか */
+    /* box-sizing:border-box なので、あふれている枠の実高＝現在の上限（px）。
+       computed の max-height は % 表記で返ることがあるため実高を使う */
+    plan.push({ slot: s, newMax: sr.height + need + 4 });
+    var targetH = sr.height + need + 4;
+    if (key === "eye" || key === "cheek"){
+      /* 上段：枠の下端が「顔の上端 - 6px」を超えないこと */
+      delta = Math.max(delta, 2 * (targetH + 6 - faceTop));
+    } else {
+      /* 下段：枠は顔の下端から始まり、舞台の下端 - 2px に収まること */
+      delta = Math.max(delta, 2 * (faceBot + targetH + 2 - wrapH));
+    }
+  });
+  delta = Math.min(Math.max(Math.ceil(delta), 0), 480);
+  if (delta > 0) wrap.style.height = (wrapH + delta) + "px";
+  plan.forEach(function(p){ p.slot.style.maxHeight = p.newMax + "px"; });
+  drawFaceLines();
+}
+/* 枠と顔の「この辺」を結ぶ控えめなリーダー線。精密な対応ではなく大まかな目安。
+   座標は顔イラストの表示矩形に対する割合（x, y）。
+   full=顔チャート1（顔全体）／eyes=顔チャート2（目元・口元のみの図）
+   アイシャドウの到達点は眼球ではなく「まぶた」の上（full＝目の上のまぶた、eyes＝ドーム状のまぶた）。
+   下段の枠は、上端をイラスト下端（首の付け根の高さ）に左右で揃え、そこから下へ伸ばす
+   （上下均等には置かない。下端は揃えなくてよい）。
+   下段の線は、枠のラベルの横にある白い余白から出す。 */
+var FACE_ANCHORS_FULL = { eye:[0.285,0.128], cheek:[0.80,0.47], foundation:[0.235,0.79], lip:[0.50,0.68] };
+var FACE_ANCHORS_EYES = { eye:[0.20,0.185], cheek:[0.87,0.46], foundation:[0.10,0.60], lip:[0.52,0.82] };
+function drawFaceLines(){
+  var svg = $("faceLines"), img = $("faceImg");
+  if (!svg || !img) return;
+  var wrap = img.parentNode;
+  var wr = wrap.getBoundingClientRect();
+  var ir = img.getBoundingClientRect();
+  if (!wr.width || !ir.width){ svg.innerHTML = ""; return; }
+  /* 下段（ファンデーション／リップ）の上端を、イラスト下端＝首の付け根の高さに揃える */
+  var bottomTop = Math.ceil(ir.bottom - wr.top) + "px";
+  ["foundation", "lip"].forEach(function(k){
+    var s = document.querySelector('#faceGrid .slot[data-slot="' + k + '"]');
+    if (s){ s.style.top = bottomTop; s.style.bottom = "auto"; }
+  });
+  var anchors = state.faceIdx === 1 ? FACE_ANCHORS_EYES : FACE_ANCHORS_FULL;
+  var out = "";
+  FACE_SLOT_DEFS.forEach(function(fs){
+    var slot = document.querySelector('#faceGrid .slot[data-slot="' + fs.key + '"]');
+    var a = anchors[fs.key];
+    if (!slot || !a) return;
+    var sr = slot.getBoundingClientRect();
+    var inset = 8, sx, sy;
+    if (fs.key === "eye"){ sx = sr.right - inset; sy = sr.bottom - inset; }
+    else if (fs.key === "cheek"){ sx = sr.left + inset; sy = sr.bottom - inset; }
+    else if (fs.key === "foundation"){ sx = sr.right + 6; sy = sr.top + 16; }
+    else { sx = sr.left - 6; sy = sr.top + 16; }
+    var tx = ir.left + ir.width * a[0] - wr.left, ty = ir.top + ir.height * a[1] - wr.top;
+    var fx = sx - wr.left, fy = sy - wr.top;
+    out += '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) +
+      '" y2="' + ty.toFixed(1) + '" stroke="#B49A5A" stroke-width="1.3" opacity="0.6"/>' +
+      '<circle cx="' + tx.toFixed(1) + '" cy="' + ty.toFixed(1) + '" r="3.2" fill="#B49A5A" opacity="0.85"/>';
+  });
+  svg.innerHTML = out;
+}
+window.addEventListener("resize", function(){ fitFaceSlots(); drawFaceLines(); });
+if ($("faceImg")) $("faceImg").addEventListener("load", function(){ fitFaceSlots(); drawFaceLines(); });
 function openFacePicker(key){
   var c = findCust(state.custId);
   if (!c) return;

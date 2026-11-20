@@ -272,6 +272,12 @@
 .lto-box p{font-size:13px;line-height:1.8;color:#555;margin:0}
 
 </style>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#958BC0">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="お客様カルテ">
 </head>
 <body>
 <div class="wrap">
@@ -2769,6 +2775,9 @@ saveDB = function(){ _linkSaveDB(); linkAfterSave(); };
 var _linkFaceSave = faceSave;
 faceSave = function(){ _linkFaceSave(); linkAfterSave(); };
 
+</script>
+<script>
+if ("serviceWorker" in navigator) { window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); }); }
 </script>
 </body>
 </html>
